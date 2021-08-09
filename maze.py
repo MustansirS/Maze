@@ -1,11 +1,20 @@
 import pygame, random
 
-NX, NY = 24, 24
-WIDTH = 600
-HEIGHT = WIDTH
-BLOCK_SIDE = int(HEIGHT / NX)
-PLAYER_SIZE = int((BLOCK_SIDE-0.2*BLOCK_SIDE)/2)
+WIDTH = 1200
+HEIGHT = 760
+BLOCK_SIDE = 20
+HALF_SIDE = int(BLOCK_SIDE / 2)
+NX, NY = int(WIDTH / BLOCK_SIDE), int(HEIGHT / BLOCK_SIDE)
+if BLOCK_SIDE != int(WIDTH / NX) or BLOCK_SIDE != int(HEIGHT / NY):
+    print("Error")
+    exit()
+PLAYER_SIZE = int((BLOCK_SIDE-0.3*BLOCK_SIDE)/2)
 win = pygame.display.set_mode((WIDTH, HEIGHT))
+BLOCK_VISITED = (102, 255, 255)
+BLOCK_CORRECT = (195, 255, 0)
+BLOCK_VISITED_CORRECT = (0, 157, 255)
+START_POINT_COLOR = (106, 220, 153)
+END_POINT_COLOR = (220, 108, 106)
 
 
 class Player():
@@ -79,17 +88,17 @@ class Cell():
         if self.reveal:
             if self.visited and not self.part_of_solved:
                 l,u = self.lu
-                pygame.draw.rect(win,(102, 255, 255),(l,u,BLOCK_SIDE,BLOCK_SIDE),0)
+                pygame.draw.rect(win,BLOCK_VISITED,(l,u,BLOCK_SIDE,BLOCK_SIDE),0)
             if self.part_of_solved and not self.visited:
                 l,u = self.lu
-                pygame.draw.rect(win,(195, 255, 0),(l,u,BLOCK_SIDE,BLOCK_SIDE),0)
+                pygame.draw.rect(win,BLOCK_CORRECT,(l,u,BLOCK_SIDE,BLOCK_SIDE),0)
             if self.visited and self.part_of_solved:
                 l,u = self.lu
-                pygame.draw.rect(win,(0, 157, 255),(l,u,BLOCK_SIDE,BLOCK_SIDE),0)
+                pygame.draw.rect(win,BLOCK_VISITED_CORRECT,(l,u,BLOCK_SIDE,BLOCK_SIDE),0)
         else:
             if self.visited:
                 l,u = self.lu
-                pygame.draw.rect(win,(102, 255, 255),(l,u,BLOCK_SIDE,BLOCK_SIDE),0)
+                pygame.draw.rect(win,BLOCK_VISITED,(l,u,BLOCK_SIDE,BLOCK_SIDE),0)
         if self.walls['N']:
             pygame.draw.line(win,self.color,self.lu,self.ru,2)
         if self.walls['S']:
@@ -99,7 +108,7 @@ class Cell():
         if self.walls['W']:
             pygame.draw.line(win,self.color,self.lu,self.ld,2)
 
-    def correction(self, posx, posy):
+    def correction(self, posx, posy, new_cell):
         if self.walls['N']:
             if posy - PLAYER_SIZE < self.y*BLOCK_SIDE:
                 posy = self.y*BLOCK_SIDE + PLAYER_SIZE
@@ -112,6 +121,21 @@ class Cell():
         if self.walls['W']:
             if posx - PLAYER_SIZE < self.x*BLOCK_SIDE:
                 posx = self.x*BLOCK_SIDE + PLAYER_SIZE
+        if new_cell.x == self.x and new_cell.y == self.y:
+            pass
+        else:
+            if self.x-1 == new_cell.x and self.y-1 == new_cell.y and new_cell.walls['E'] and new_cell.walls['S']:
+                posx = self.x*BLOCK_SIDE + PLAYER_SIZE
+                posy = self.y*BLOCK_SIDE + PLAYER_SIZE
+            if self.x-1 == new_cell.x and self.y+1 == new_cell.y and new_cell.walls['E'] and new_cell.walls['N']:
+                posx = self.x*BLOCK_SIDE + PLAYER_SIZE
+                posy = (self.y+1)*BLOCK_SIDE - PLAYER_SIZE
+            if self.x+1 == new_cell.x and self.y-1 == new_cell.y and new_cell.walls['W'] and new_cell.walls['S']:
+                posx = (self.x+1)*BLOCK_SIDE - PLAYER_SIZE
+                posy = self.y*BLOCK_SIDE + PLAYER_SIZE
+            if self.x+1 == new_cell.x and self.y+1 == new_cell.y and new_cell.walls['W'] and new_cell.walls['N']:
+                posx = (self.x+1)*BLOCK_SIDE - PLAYER_SIZE
+                posy = (self.y+1)*BLOCK_SIDE - PLAYER_SIZE
         return posx, posy
 
     def mark_visited(self):
@@ -127,10 +151,10 @@ class Maze():
         self.ix, self.iy = ix, iy
         self.maze_map = [[Cell(x, y, wall_color) for y in range(ny)] for x in range(nx)]
         self.solving_visited = [[False for y in range(ny)] for x in range(nx)]
-        corners = [(0,x) for x in range(NY)] + [(x,0) for x in range(NX)] + [(NX-1,x) for x in range(NY)] + [(x,NY-1) for x in range(NX)]
+        corners = [(0,x) for x in range(nx)] + [(x,0) for x in range(ny)] + [(nx-1,x) for x in range(ny)] + [(x,ny-1) for x in range(nx)]
         self.startpoint = random.choice(corners)
         a,b = self.startpoint
-        self.endpoint = (NX-1-a,NY-1-b)
+        self.endpoint = (nx-1-a,ny-1-b)
 
     def cell_at(self, x, y):
         return self.maze_map[x][y]
@@ -198,15 +222,17 @@ class Maze():
             for y in range(self.ny):
                 self.cell_at(x,y).draw(win)
         a,b = self.startpoint
-        pygame.draw.circle(win,(106, 220, 153),((a*BLOCK_SIDE)+int(BLOCK_SIDE/2),(b*BLOCK_SIDE)+int(BLOCK_SIDE/2)),int(BLOCK_SIDE/2))
+        pygame.draw.circle(win,START_POINT_COLOR,((a*BLOCK_SIDE)+HALF_SIDE,(b*BLOCK_SIDE)+HALF_SIDE),HALF_SIDE)
         a,b = self.endpoint
-        pygame.draw.circle(win,(220, 108, 106),((a*BLOCK_SIDE)+int(BLOCK_SIDE/2),(b*BLOCK_SIDE)+int(BLOCK_SIDE/2)),int(BLOCK_SIDE/2))
+        pygame.draw.circle(win,END_POINT_COLOR,((a*BLOCK_SIDE)+HALF_SIDE,(b*BLOCK_SIDE)+HALF_SIDE),HALF_SIDE)
 
     def correction(self, posx, posy, prevx, prevy):
         x = int(prevx / BLOCK_SIDE)
         y = int(prevy / BLOCK_SIDE)
+        new_x = int(posx / BLOCK_SIDE)
+        new_y = int(posy / BLOCK_SIDE)
         self.cell_at(x,y).mark_visited()
-        return self.cell_at(x,y).correction(posx,posy)
+        return self.cell_at(x,y).correction(posx,posy,self.cell_at(new_x,new_y))
 
     def won(self, posx, posy):
         x = int(posx / BLOCK_SIDE)
@@ -237,7 +263,7 @@ def main():
     run = True
     m = Maze(NX,NY,(0,0,0))
     a,b = m.startpoint
-    p = Player((a*BLOCK_SIDE)+int(BLOCK_SIDE/2),(b*BLOCK_SIDE)+int(BLOCK_SIDE/2),PLAYER_SIZE,(0,0,0))
+    p = Player((a*BLOCK_SIDE)+HALF_SIDE,(b*BLOCK_SIDE)+HALF_SIDE,PLAYER_SIZE,(0,0,0))
     m.make_maze()
     m.solve_maze(a,b)
     clock = pygame.time.Clock()
